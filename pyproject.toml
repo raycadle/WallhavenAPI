@@ -1,0 +1,29 @@
+[project]
+name = "wallhavenapi"     # This must be unique on PyPI
+version = "0.1.0"         # Increment with each release
+description = "A Python wrapper for the Wallhaven.cc API v1."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "Ray Cadle", email = "you@example.com" }
+]
+keywords = ["wallhaven", "api", "wallpaper", "image", "wrapper"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Intended Audience :: Developers",
+  "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+  "Topic :: Multimedia :: Graphics"
+]
+dependencies = ["requests>=2.0"]
+
+[project.urls]
+Homepage = "https://github.com/raycadle/WallhavenAPI"
+Repository = "https://github.com/raycadle/WallhavenAPI"
+Issues = "https://github.com/raycadle/WallhavenAPI/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
