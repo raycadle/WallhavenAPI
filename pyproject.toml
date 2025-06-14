@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [
-  { name = "Ray Cadle", email = "you@example.com" }
+  { name = "Ray Cadle", email = "93884664+raycadle@users.noreply.github.com" }
 ]
 keywords = ["wallhaven", "api", "wallpaper", "image", "wrapper"]
 classifiers = [
