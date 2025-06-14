@@ -1,0 +1,337 @@
+name: Python Tests CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
+jobs:
+  test:
+    name: Runs Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies and test tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements-tests.txt
+
+      - name: Run tests with coverage
+        run: pytest --cov=wallhavenapi --cov-report=term-missing --cov-report=xml --cov-report=html /tests
+
+      - name: Upload coverage reports artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage.xml
+            htmlcov/
+
+  deploy-coverage:
+    name: Upload Coverage Report to Codecov and Github Pages
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage/
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/coverage.xml
+          fail_ci_if_error: true
+
+      - name: Set deploy folder and info
+        id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            FOLDER="pr-${{ github.event.pull_request.number }}"
+          else
+            FOLDER="latest"
+          fi
+
+          echo "folder=$FOLDER" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "commit_msg=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+          echo "commit_url=https://github.com/${{ github.repository }}/commit/$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Clone gh-pages branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git clone --depth 1 --branch gh-pages https://github.com/${{ github.repository }} gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Copy coverage report
+        run: |
+          mkdir -p gh-pages/coverage/${{ steps.meta.outputs.folder }}
+          cp -r coverage/htmlcov/* gh-pages/coverage/${{ steps.meta.outputs.folder }}/
+
+      - name: Clean up closed PRs
+        run: |
+          cd gh-pages/coverage
+          for prdir in pr-*; do
+            prnum=$(echo "$prdir" | sed 's/pr-//')
+            STATUS=$(gh pr view $prnum --json state -q ".state" || echo "unknown")
+            if [[ "$STATUS" != "OPEN" ]]; then
+              echo "Removing $prdir (state: $STATUS)"
+              rm -rf "$prdir"
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate index.html
+        run: |
+          cd gh-pages/coverage
+          cat <<EOF > index.html
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>Coverage Reports</title>
+            <style>
+              :root {
+                color-scheme: light dark;
+              }
+              body {
+                font-family: system-ui, sans-serif;
+                margin: 2rem;
+                background-color: var(--bg, #f9f9f9);
+                color: var(--text, #111);
+                transition: background 0.3s, color 0.3s;
+              }
+              body.dark {
+                --bg: #111;
+                --text: #eee;
+              }
+              h1 {
+                font-size: 2rem;
+                border-bottom: 2px solid #ccc;
+              }
+              h2 {
+                margin-top: 2rem;
+                font-size: 1.5rem;
+              }
+              ul {
+                list-style: none;
+                padding-left: 0;
+              }
+              li {
+                margin: 0.4rem 0;
+              }
+              a {
+                color: #0074d9;
+                text-decoration: none;
+              }
+              a:hover {
+                text-decoration: underline;
+              }
+              .meta {
+                font-size: 0.9rem;
+                color: #666;
+              }
+              .badge {
+                display: inline-block;
+                font-size: 0.75rem;
+                font-weight: bold;
+                color: white;
+                padding: 0.15em 0.5em;
+                border-radius: 0.4em;
+                margin-left: 0.5em;
+              }
+              .badge-green { background: #28a745; }
+              .badge-blue { background: #0366d6; }
+              .toggle-btn {
+                position: absolute;
+                top: 1rem;
+                right: 1rem;
+                font-size: 1rem;
+                cursor: pointer;
+              }
+            </style>
+            <script>
+              function toggleTheme() {
+                const body = document.body;
+                body.classList.toggle('dark');
+                const theme = body.classList.contains('dark') ? 'dark' : 'light';
+                localStorage.setItem('theme', theme);
+              }
+              window.addEventListener('DOMContentLoaded', () => {
+                const saved = localStorage.getItem('theme');
+                if (saved === 'dark') {
+                  document.body.classList.add('dark');
+                }
+              });
+            </script>
+          </head>
+          <body>
+            <button class="toggle-btn" onclick="toggleTheme()">🌙 / ☀️</button>
+
+            <h1>Coverage Reports</h1>
+            <div class="meta">
+              <p>Last updated: ${{ steps.meta.outputs.timestamp }}</p>
+              <p>Commit: <a href="${{ steps.meta.outputs.commit_url }}">${{ steps.meta.outputs.short_sha }}</a> – ${{ steps.meta.outputs.commit_msg }}</p>
+            </div>
+
+            <h2>Latest (main)</h2>
+            <ul>
+              <li>
+                <a href="latest/index.html">View coverage report</a>
+                <span class="badge badge-green">Latest</span>
+              </li>
+            </ul>
+
+            <h2>Open Pull Requests</h2>
+            <ul>
+          EOF
+
+          for prdir in pr-*; do
+            if [ -f "$prdir/index.html" ]; then
+              echo "<li><a href=\"$prdir/index.html\">$prdir</a><span class=\"badge badge-blue\">Open PR</span></li>" >> index.html
+            fi
+          done
+
+          echo "</ul></body></html>" >> index.html
+
+      - name: Push to GitHub Pages
+        run: |
+          cd gh-pages
+          git add .
+          git commit -m "Deploy coverage: ${{ steps.meta.outputs.folder }}"
+          git push origin gh-pages
+
+  tag-semver:
+    name: Tag with Semantic Version
+    needs: test # Only runs if the 'test' job succeeds
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required to access all tags
+
+      - name: Get latest semantic tag
+        id: get_tag
+        run: |
+          TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || echo "v0.0.0")
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Determine bump type from commit message
+        id: bump_type
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -iq "#major"; then
+            echo "bump=major" >> "$GITHUB_OUTPUT"
+          elif echo "$COMMIT_MSG" | grep -iq "#minor"; then
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version
+        id: bump_version
+        run: |
+          OLD_TAG=${{ steps.get_tag.outputs.tag }}
+          VERSION=${OLD_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          case "${{ steps.bump_type.outputs.bump }}" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0;;
+            patch) PATCH=$((PATCH + 1));;
+          esac
+
+          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push new tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.bump_version.outputs.new_tag }}
+          git push origin ${{ steps.bump_version.outputs.new_tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tag-open-pr:
+    name: Tag Open Pull Request (Non-Semantic)
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Tag merged pull request
+        run: |
+          PR_NUNBER=${{ github.event.pull_request.number }}
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+  cleanup:
+    name: Delete Merged PR Tags
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete merged PR tags
+        run: |
+          git fetch --tags
+          git branch --contains HEAD  # debug
+          for tag in $(git tag --list "pr-*"); do
+            # Get the commit hash the tag points to
+            tag_commit=$(git rev-list -n 1 "$tag")
+
+            # Check if commit is part of main branch history
+            if git merge-base --is-ancestor "$tag_commit" origin/main; then
+              echo "Deleting tag $tag (merged into main)"
+              git tag -d "$tag"
+              git push origin ":refs/tags/$tag"
+            else
+              echo "Keeping tag $tag (not yet merged into main)"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
