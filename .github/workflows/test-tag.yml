@@ -220,6 +220,9 @@ jobs:
       - name: Push to GitHub Pages
         run: |
           cd gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git add .
           git commit -m "Deploy coverage: ${{ steps.meta.outputs.folder }}"
           git push origin gh-pages
