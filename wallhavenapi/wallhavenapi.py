@@ -1,8 +1,9 @@
 """
 Wallhaven API v1 Python Wrapper
 
-This module provides a client interface to the Wallhaven.cc API v1. It enables
-users to search, retrieve, and download wallpapers, as well as manage collections.
+This module provides a client interface to the Wallhaven.cc API v1.
+It enables users to search, retrieve, and download wallpapers,
+as well as manage collections.
 
 Author: Ray Cadle
 License: MIT
@@ -14,26 +15,26 @@ import random
 import string
 import time
 from enum import Enum
-from typing import Tuple, Dict, List, Optional, Union
+from typing import Tuple, Dict, List, Optional, Union, Any
 
 # ---------- Enums ----------
 
 class Purity(Enum):
-    """Defines safety filters for wallpaper content."""
+    """Defines safety filters for wallpaper content used to filter SFW, sketchy, or NSFW results."""
     sfw = "sfw"
     sketchy = "sketchy"
     nsfw = "nsfw"
 
 
 class Category(Enum):
-    """Defines wallpaper categories."""
+    """Defines wallpaper categories for filtering search results."""
     general = "general"
     anime = "anime"
     people = "people"
 
 
 class Sorting(Enum):
-    """Defines sorting options for search results."""
+    """Defines sorting options for search results returned by the API."""
     date_added = "date_added"
     relevance = "relevance"
     random = "random"
@@ -43,14 +44,13 @@ class Sorting(Enum):
 
 
 class Order(Enum):
-    """Defines ordering direction for sorting."""
-    # Default: desc
+    """Defines the ordering direction for sorting (ascending or descending). Default: desc"""
     desc = "desc"
     asc = "asc"
 
 
 class TopRange(Enum):
-    """Defines time ranges for the 'toplist' sorting."""
+    """Defines time-based ranges used when sorting by 'toplist'."""
     one_day = "1d"
     three_days = "3d"
     one_week = "1w"
@@ -61,7 +61,7 @@ class TopRange(Enum):
 
 
 class Color(Enum):
-    """Color hex codes for dominant color filtering in search."""
+    """Provides a list of predefined color hex codes for filtering wallpapers by dominant color."""
     lonestar = "660000"
     red_berry = "990000"
     guardsman_red = "cc0000"
@@ -94,7 +94,7 @@ class Color(Enum):
 
 
 class Type(Enum):
-    """Defines supported image formats."""
+    """Defines supported image formats for filtering search results."""
     jpeg = "jpeg"
     jpg = "jpg"
     png = "png"
@@ -103,47 +103,112 @@ class Type(Enum):
 # ---------- Utilities ----------
 
 class Seed:
-    """Utility class for generating random seeds."""
-
+    """Utility class for generating random alphanumeric seeds."""
     @staticmethod
     def generate() -> str:
-        """Generate a random 6-character alphanumeric seed."""
+        """
+        Generate a random 6-character alphanumeric seed string.
+
+        Returns:
+            str: Random seed composed of letters and digits.
+        """
         return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(6))
 
 
 # ---------- Exceptions ----------
 
 class RequestsLimitError(Exception):
-    """Raised when the API request limit is exceeded."""
-    def __init__(self):
-        super().__init__("You have exceeded requests limit. Please try later.")
+    """
+    Raised when the API request limit (HTTP 429) is exceeded.
+    
+    Attributes:
+        message (str, optional): A custom error message that overrides the default.
+        status_code (int): HTTP status code received from the API.
+    """
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        status_code: int = 429
+    ):
+        self.status_code = status_code
+        default_msg: str = "You have exceeded the requests limit. Please try later."
+        super().__init__(message or default_msg)
 
 
 class ApiKeyError(Exception):
-    """Raised when an invalid API key is used."""
-    def __init__(self):
-        super().__init__("Bad api key. Check it please.")
-
-
-class UnhandledException(Exception):
-    """Raised for unhandled API errors."""
-    def __init__(self):
-        super().__init__("Something went wrong. Please submit this issue to https://github.com/raycadle/WallhavenAPI/issues.")
+    """
+    Raised when an invalid, missing, or unauthorized API key is used.
+    
+    Attributes:
+        message (str, optional): A custom error message that overrides the default.
+        status_code (int): HTTP status code received from the API.
+    """
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        status_code: int = 401
+    ):
+        self.status_code = status_code
+        default_msg: str = "Bad API key. Check it please."
+        super().__init__(message or default_msg)
 
 
 class NoWallpaperError(Exception):
-    """Raised when a wallpaper with the given ID does not exist."""
-    def __init__(self, wallpaper_id: str):
-        super().__init__(f"No wallpaper with id {wallpaper_id}")
+    """
+    Raised when no wallpaper with the specified ID exists.
+
+    Attributes:
+        wallpaper_id (str): ID of the wallpaper that was not found.
+        message (str, optional): A custom error message that overrides the default.
+        status_code (int): HTTP status code received from the API.
+    """
+    def __init__(
+        self,
+        wallpaper_id: str,
+        message: Optional[str] = None,
+        status_code: int = 404
+    ):
+        self.wallpaper_id = wallpaper_id
+        self.status_code = status_code
+        default_msg: str = f"No wallpaper with id {wallpaper_id}"
+        super().__init__(message or default_msg)
+
+
+class UnhandledException(Exception):
+    """
+    Raised for any unhandled API errors or unexpected HTTP responses.
+
+    Attributes:
+        message (str, optional): A custom error message that overrides the default.
+        status_code (int, optional): HTTP status code if available.
+    """
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        status_code: Optional[int] = None
+    ):
+        self.status_code = status_code
+        default_msg: str = "Something went wrong. Please submit this issue to https://github.com/raycadle/WallhavenAPI/issues."
+        super().__init__(message or default_msg)
 
 
 # ---------- API Client Class ----------
 
 class WallhavenAPI:
     """
-    Main interface for interacting with the Wallhaven.cc API v1.
-    """
+    Main interface class for interacting with the Wallhaven.cc API v1.
 
+    This class handles requests, retries on failures, search queries,
+    downloads, and account-specific endpoints like collections or settings.
+
+    Attributes:
+        api_key (str, optional): Wallhaven API key (optional for some endpoints).
+        verify_connection (bool): Whether to verify SSL certificates.
+        base_url (str): The base API endpoint URL.
+        timeout (tuple of integers): Request timeout settings.
+        requestslimit_timeout (tuple of integers, optional): Retry configuration on rate limits.
+        proxies (dictionary of strings): HTTP/HTTPS proxy settings.
+    """
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -151,75 +216,220 @@ class WallhavenAPI:
         base_url: str = "https://wallhaven.cc/api/v1",
         timeout: Tuple[int, int] = (2, 5),
         requestslimit_timeout: Optional[Tuple[int, int]] = None,
-        proxies: Dict[str, str] = {}
+        proxies: Dict[str, str] = None
     ):
-
-        """
-        Initialize the API wrapper.
-
-        Args:
-            api_key (str, optional): Your Wallhaven API key.
-            verify_connection (bool): SSL verification for requests.
-            base_url (str): API base URL.
-            timeout (tuple): (connect_timeout, read_timeout).
-            requestslimit_timeout (tuple, optional): (max_retries, delay_in_seconds).
-            proxies (dict): Dictionary of HTTP proxies.
-        """
-
-        self.verify_connection = verify_connection
         self.api_key = api_key
+        self.verify_connection = verify_connection
         self.base_url = base_url
         self.timeout = timeout
         self.requestslimit_timeout = requestslimit_timeout
-        self.proxies = proxies
+        self.proxies = proxies or {}
 
-    def _request(self, to_json: bool, **kwargs) -> Union[dict, requests.Response]:
-        """Internal method to wrap API requests and handle errors."""
+    def _request(
+        self,
+        to_json: bool,
+        **kwargs: Any
+    ) -> Union[dict, requests.Response]:
+        """
+        Internal method to perform HTTP requests with retry and error handling.
 
-        for i in range(self.requestslimit_timeout[0] if self.requestslimit_timeout else 1):
+        Args:
+            to_json (bool): Whether to return the response as JSON.
+            **kwargs: Parameters passed to requests.request.
+
+        Returns:
+            dict or requests.Response: Parsed JSON response or raw response.
+
+        Raises:
+            RequestsLimitError: If rate-limited and retries are exhausted.
+            ApiKeyError: If API key is invalid.
+            UnhandledException: For all other unexpected issues.
+        """
+        max_retries = self.requestslimit_timeout[0] if self.requestslimit_timeout else 1
+        delay = self.requestslimit_timeout[1] if self.requestslimit_timeout else 0
+    
+        for attempt in range(max_retries):
+            # Add API key to query params if available
             if self.api_key:
                 kwargs.setdefault("params", {})["apikey"] = self.api_key
-
+            
+            # Apply request configuration
             kwargs.setdefault("timeout", self.timeout)
             kwargs.setdefault("verify", self.verify_connection)
             kwargs.setdefault("proxies", self.proxies)
-
-            response = requests.request(**kwargs)
-
-            if response.status_code == 429:
-                if not self.requestslimit_timeout or i == self.requestslimit_timeout[0] - 1:
-                    raise RequestsLimitError
-                time.sleep(self.requestslimit_timeout[1])
+        
+            # Send the request
+            try:
+                response = requests.request(**kwargs)
+            except requests.RequestException as e:
+                if attempt == max_retries - 1:
+                    raise UnhandledException(message=f"Request failed: {str(e)}")
+                time.sleep(delay)
                 continue
-
-            if response.status_code == 401:
-                raise ApiKeyError
-
-            if response.status_code != 200:
-                raise UnhandledException
-
+            
+            status_code = response.status_code
+        
+            # Handle rate limiting (retry if needed)
+            if status_code == 429:
+                if attempt == max_retries - 1:
+                    raise RequestsLimitError(status_code=status_code)
+                time.sleep(delay)
+                continue
+            
+            # Handle invalid API key
+            if status_code == 401:
+                raise ApiKeyError(status_code=status_code)
+            
+            # Handle 404 (let caller interpret if needed)
+            if status_code == 404:
+                raise UnhandledException(
+                    message=f"404 Not Found for URL: {response.url}",
+                    status_code=status_code
+                )
+            
+            # Handle any other non-200 status codes
+            if status_code != 200:
+                raise UnhandledException(
+                    message=f"Unexpected status code {status_code} for URL: {response.url}",
+                    status_code=status_code
+                )
+            
+            # Return JSON or raw response
             if to_json:
                 try:
                     return response.json()
-                except:
-                    raise UnhandledException
-
+                except Exception as e:
+                    raise UnhandledException(
+                        message=f"JSON decode error: {str(e)}",
+                        status_code=status_code
+                    )
+                
             return response
+        
+        # If somehow loop ends without return or raise, raise generic error
+        raise UnhandledException(message="Request failed after all retry attempts.")
 
-    def _url_format(self, *args: Union[str, int]) -> str:
-        """Build full API endpoint URL."""
+    def _raw_request(
+        self,
+        url: str
+    ) -> requests.Response:
+        """
+        Perform a raw GET request with retry and error handling, respecting client settings.
+
+        Args:
+            url (str): The full URL of the resource to download.
+
+        Returns:
+            requests.Response: The HTTP response with streamed content.
+
+        Raises:
+            RequestsLimitError: If too many requests and retries exhausted.
+            UnhandledException: For unexpected HTTP errors.
+        """
+        max_retries = self.requestslimit_timeout[0] if self.requestslimit_timeout else 1
+        delay = self.requestslimit_timeout[1] if self.requestslimit_timeout else 0
+        
+        for attempt in range(max_retries):
+            
+            # Send the request
+            try:
+                response = requests.get(
+                    url,
+                    stream=True,
+                    timeout=self.timeout,
+                    verify=self.verify_connection,
+                    proxies=self.proxies,
+                )
+                if response.status_code == 200:
+                    return response
+                elif response.status_code == 429:
+                    if attempt == max_retries - 1:
+                        raise RequestsLimitError()
+                    time.sleep(delay)
+                    continue
+                else:
+                    raise UnhandledException(
+                        message=f"Unexpected status code {response.status_code} for URL: {url}",
+                        status_code=response.status_code,
+                    )
+            except requests.RequestException as e:
+                # Network-related errors or connection issues
+                if attempt == max_retries - 1:
+                    raise UnhandledException(message=f"Request failed: {str(e)}")
+                time.sleep(delay)
+        
+        # If somehow loop ends without return or raise, raise generic error
+        raise UnhandledException(message="Failed to download after multiple attempts.")
+
+    def _format_url(
+        self,
+        *args: Union[str, int]
+    ) -> str:
+        """
+        Build a formatted API endpoint URL by appending path components.
+
+        Args:
+            *args (str or int): Path components to join to the base URL.
+
+        Returns:
+            str: Full URL to the API endpoint.
+        """
         url = self.base_url.rstrip("/") + "/"
         return url + "/".join(map(str, args))
 
     @staticmethod
-    def _category(general: bool = True, anime: bool = True, people: bool = False) -> str:
-        """Convert category booleans to API format."""
+    def _category(
+        general: bool = True,
+        anime: bool = True,
+        people: bool = False
+    ) -> str:
+        """
+        Convert category flags to API-compatible string format.
+
+        Args:
+            general (bool): Include general wallpapers.
+            anime (bool): Include anime wallpapers.
+            people (bool): Include people wallpapers.
+
+        Returns:
+            str: Category format string, e.g., '110'.
+        """
         return f"{int(general)}{int(anime)}{int(people)}"
 
     @staticmethod
-    def _purity(sfw: bool = True, sketchy: bool = True, nsfw: bool = False) -> str:
-        """Convert purity booleans to API format."""
+    def _purity(
+        sfw: bool = True,
+        sketchy: bool = True,
+        nsfw: bool = False
+    ) -> str:
+        """
+        Convert purity flags to API-compatible string format.
+
+        Args:
+            sfw (bool): Include safe-for-work content.
+            sketchy (bool): Include sketchy content.
+            nsfw (bool): Include not-safe-for-work content.
+
+        Returns:
+            str: Purity format string, e.g., '110'.
+        """
         return f"{int(sfw)}{int(sketchy)}{int(nsfw)}"
+
+    @staticmethod
+    def _format_dimensions(dims: Union[Tuple[int, int], List[Tuple[int, int]]]) -> str:
+        """
+        Format a single dimension tuple or a list of tuples into
+        a comma-separated string suitable for the API.
+
+        Args:
+            dims (tuple of integers or list of tuples of integers):
+                A single (width, height) tuple or list of such tuples.
+
+        Returns:
+            str: A string formatted as "WxH,WxH,..."
+        """
+        dims = dims if isinstance(dims, list) else [dims]
+        return ",".join(f"{w}x{h}" for w, h in dims)
 
     def search(
         self,
@@ -236,9 +446,22 @@ class WallhavenAPI:
         page: Optional[int] = None,
         seed: Optional[str] = None
     ) -> dict:
-
         """
-        Perform a wallpaper search.
+        Search for wallpapers using various filters and parameters.
+
+        Args:
+            q (str, optional): Query string (e.g., keywords or tags).
+            categories (list or Category, optional): Categories to include.
+            purities (list or Purity, optional): Purity filters (SFW, NSFW, etc.).
+            sorting (Sorting, optional): How to sort the results.
+            order (Order, optional): Sort direction (asc or desc).
+            top_range (TopRange, optional): Time range for toplist sorting.
+            atleast (tuple of integers, optional): Minimum resolution (width, height).
+            resolutions (tuple of integers or list of tuples of integers, optional): Exact resolutions.
+            ratios (tuple of integers or list of tuples of integers, optional): Screen ratios (e.g., 16:9).
+            colors (Color, optional): Dominant color to filter by.
+            page (int, optional): Page number of results.
+            seed (str, optional): Seed for reproducible random results.
 
         Returns:
             dict: JSON response from Wallhaven API.
@@ -263,25 +486,56 @@ class WallhavenAPI:
         if order: params["order"] = order.value
         if top_range: params["topRange"] = top_range.value
         if atleast: params["atleast"] = f"{atleast[0]}x{atleast[1]}"
-        if resolutions:
-            resolutions = resolutions if isinstance(resolutions, list) else [resolutions]
-            params["resolutions"] = ",".join([f"{w}x{h}" for w, h in resolutions])
-        if ratios:
-            ratios = ratios if isinstance(ratios, list) else [ratios]
-            params["ratios"] = ",".join([f"{w}x{h}" for w, h in ratios])
+        if resolutions: params["resolutions"] = self._format_dimensions(resolutions)
+        if ratios: params["ratios"] = self._format_dimensions(ratios)
         if colors: params["colors"] = colors.value
         if page: params["page"] = str(page)
         if seed: params["seed"] = seed
 
-        return self._request(True, method="get", url=self._url_format("search"), params=params)
+        return self._request(True, method="get", url=self._format_url("search"), params=params)
 
-    def wallpaper(self, wallpaper_id: str) -> dict:
-        """Get metadata for a single wallpaper by ID."""
-        return self._request(True, method="get", url=self._url_format("w", wallpaper_id))
+    def wallpaper(
+        self,
+        wallpaper_id: str
+    ) -> dict:
+        """
+        Retrieve metadata for a specific wallpaper by ID.
 
-    def is_wallpaper_exists(self, wallpaper_id: str) -> bool:
-        """Check whether a wallpaper exists."""
-        return "error" not in self.wallpaper(wallpaper_id)
+        Args:
+            wallpaper_id (str): The unique ID of the wallpaper.
+
+        Returns:
+            dict: Metadata about the wallpaper.
+
+        Raises:
+            NoWallpaperError: If the wallpaper is not found.
+        """
+        try:
+            return self._request(True, method="get", url=self._format_url("w", wallpaper_id))
+        except UnhandledException as e:
+            # If the error was due to a 404, convert it to a NoWallpaperError
+            if e.status_code == 404:
+                raise NoWallpaperError(wallpaper_id)
+            raise  # Re-raise other unhandled exceptions
+
+    def is_wallpaper_exists(
+        self,
+        wallpaper_id: str
+    ) -> bool:
+        """
+        Check if a wallpaper exists on Wallhaven.
+
+        Args:
+            wallpaper_id (str): The wallpaper ID to check.
+
+        Returns:
+            bool: True if wallpaper exists, False otherwise.
+        """
+        try:
+            self.wallpaper(wallpaper_id)
+            return True
+        except NoWallpaperError:
+            return False
 
     def download_wallpaper(
         self,
@@ -294,45 +548,99 @@ class WallhavenAPI:
 
         Args:
             wallpaper_id (str): Wallpaper ID.
-            file_path (str): File path to save image.
+            file_path (str, optional): Path where image should be saved. If None, returns binary content.
             chunk_size (int): Stream chunk size.
 
         Returns:
             str or bytes: Saved path or raw content.
         """
         wallpaper_data = self.wallpaper(wallpaper_id)
-        if "error" in wallpaper_data:
-            raise NoWallpaperError(wallpaper_id)
-
-        wallpaper = requests.get(
-            wallpaper_data["data"]["path"],
-            stream=True,
-            timeout=self.timeout,
-            verify=self.verify_connection,
-        )
-        if wallpaper.status_code != 200: raise UnhandledException
+        wallpaper = self._raw_request(wallpaper_data["data"]["path"])
 
         if file_path:
             save_path = os.path.abspath(file_path)
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             with open(save_path, "wb") as f:
-                for chunk in wallpaper.iter_content(chunk_size):
-                    f.write(chunk)
+                for chunk in wallpaper.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        f.write(chunk)
             return save_path
 
-        return wallpaper.content
+        return b"".join(wallpaper.iter_content(chunk_size=chunk_size))
 
-    def tag(self, tag_id: Union[str, int]) -> dict:
-        """Retrieve information for a given tag ID."""
-        return self._request(True, method="get", url=self._url_format("tag", tag_id))
+    def tag(
+        self,
+        tag_id: Union[str, int]
+    ) -> dict:
+        """
+        Retrieve tag details by tag ID.
 
-    def settings(self) -> Optional[dict]:
-        """Get account settings (requires API key)."""
-        return None if self.api_key is None else self._request(True, method="get", url=self._url_format("settings"))
+        Args:
+            tag_id (str or int): ID of the tag to retrieve.
 
-    def collections(self, user_name: str) -> dict:
-        """Get public collections for a given user."""
-        return self._request(True, method="get", url=self._url_format(f"collections/{user_name}"))
+        Returns:
+            dict: Tag metadata.
+        """
+        return self._request(
+            True,
+            method="get",
+            url=self._format_url("tag", tag_id)
+        )
+
+    def settings(self) -> dict:
+        """
+        Retrieve account settings (requires valid API key).
+
+        Returns:
+            dict: User settings as provided by Wallhaven.
+
+        Raises:
+            ApiKeyError: If API key is missing or invalid.
+        """
+        if self.api_key is None:
+            raise ApiKeyError("API key required to retrieve settings.")
+        return self._request(
+            True,
+            method="get",
+            url=self._format_url("settings")
+        )
+
+    def my_collections(self) -> dict:
+        """
+        Get personal collections for the current user (requires API key).
+
+        Returns:
+            dict: User's collections.
+
+        Raises:
+            ApiKeyError: If API key is missing.
+        """
+        if self.api_key is None:
+            raise ApiKeyError("API key required to retrieve collections.")
+        return self._request(
+            True,
+            method="get",
+            url=self._format_url("collections")
+        )
+
+    def user_collections(
+        self,
+        user_name: str
+    ) -> dict:
+        """
+        Retrieve public collections of another Wallhaven user.
+
+        Args:
+            user_name (str): The username whose collections to fetch.
+
+        Returns:
+            dict: Public collections for that user.
+        """
+        return self._request(
+            True,
+            method="get",
+            url=self._format_url("collections", user_name)
+        )
 
     def collection_wallpapers(
         self,
@@ -340,14 +648,21 @@ class WallhavenAPI:
         collection_id: Union[str, int],
         page: Optional[int] = None
     ) -> dict:
-        """Retrieve wallpapers from a specific collection."""
+        """
+        Fetch wallpapers from a specific user's collection.
+
+        Args:
+            user_name (str): Username who owns the collection.
+            collection_id (str or int): The collection's ID.
+            page (int, optional): Page number of results.
+
+        Returns:
+            dict: Wallpapers from the collection.
+        """
+        params = {"page": str(page)} if page is not None else {}
         return self._request(
             True,
             method="get",
-            url=self._url_format(f"collections/{user_name}/{collection_id}"),
-            params={"page": str(page)} if page is not None else {}
+            url=self._format_url("collections", user_name, collection_id),
+            params=params
         )
-
-    def my_collections(self) -> Optional[dict]:
-        """Get collections for the current user (requires API key)."""
-        return None if self.api_key is None else self._request(True, method="get", url=self._url_format("collections"))
