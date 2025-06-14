@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Coverage Reports</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 2rem;
+      background-color: var(--bg, #f9f9f9);
+      color: var(--text, #111);
+      transition: background 0.3s, color 0.3s;
+    }
+    body.dark {
+      --bg: #111;
+      --text: #eee;
+    }
+    h1 {
+      font-size: 2rem;
+      border-bottom: 2px solid #ccc;
+    }
+    h2 {
+      margin-top: 2rem;
+      font-size: 1.5rem;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    li {
+      margin: 0.4rem 0;
+    }
+    a {
+      color: #0074d9;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .meta {
+      font-size: 0.9rem;
+      color: #666;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: white;
+      padding: 0.15em 0.5em;
+      border-radius: 0.4em;
+      margin-left: 0.5em;
+    }
+    .badge-green { background: #28a745; }
+    .badge-blue { background: #0366d6; }
+    .toggle-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+  </style>
+  <script>
+    function toggleTheme() {
+      const body = document.body;
+      body.classList.toggle('dark');
+      const theme = body.classList.contains('dark') ? 'dark' : 'light';
+      localStorage.setItem('theme', theme);
+    }
+    window.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark') {
+        document.body.classList.add('dark');
+      }
+    });
+  </script>
+</head>
+<body>
+  <button class="toggle-btn" onclick="toggleTheme()">🌙 / ☀️</button>
+
+  <h1>Coverage Reports</h1>
+  <div class="meta">
+    <p>Last updated: 2025-06-14 05:33:05 UTC</p>
+    <p>Commit: <a href="https://github.com/raycadle/WallhavenAPI/commit/93ac6773547ee763c11ff2c399acf61c16a1807c">93ac677</a> – CI: add auth lines to workflow</p>
+  </div>
+
+  <h2>Latest (main)</h2>
+  <ul>
+    <li>
+      <a href="latest/index.html">View coverage report</a>
+      <span class="badge badge-green">Latest</span>
+    </li>
+  </ul>
+
+  <h2>Open Pull Requests</h2>
+  <ul>
+</ul></body></html>
