@@ -40,12 +40,12 @@ def test_category_and_purity_helpers() -> None:
     assert WallhavenAPI._purity(False, True, True) == "011"
 
 
-def test_url_format(api: WallhavenAPI) -> None:
+def test_format_url(api: WallhavenAPI) -> None:
     """
-    Test the internal _url_format method to ensure it generates the
+    Test the internal _format_url method to ensure it generates the
     correct endpoint URL.
     """
-    url: str = api._url_format("search")
+    url: str = api._format_url("search")
     assert url == f"{API_BASE_URL}/search"
 
 
