@@ -1,5 +1,5 @@
-from .wallhavenapi import WallhavenAPI, Category, Purity, Sorting, Order, TopRange, Color, Type
-from .wallhavenapi import RequestsLimitError, ApiKeyError, UnhandledException, NoWallpaperError
+from .wallhavenapi import WallhavenAPI, Category, Purity, Sorting, Order, TopRange, Color, Type, Seed
+from .wallhavenapi import RequestsLimitError, ApiKeyError, NoWallpaperError, UnhandledException
 
 __all__ = [
     "WallhavenAPI",
@@ -10,8 +10,9 @@ __all__ = [
     "TopRange",
     "Color",
     "Type",
+    "Seed",
     "RequestsLimitError",
     "ApiKeyError",
-    "UnhandledException",
-    "NoWallpaperError"
+    "NoWallpaperError",
+    "UnhandledException"
 ]
