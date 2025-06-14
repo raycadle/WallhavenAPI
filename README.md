@@ -10,7 +10,7 @@ It is suitable for building custom tools or integrations around the Wallhaven AP
 > This project is unofficial and not affiliated with [Wallhaven.cc](https://wallhaven.cc).
 > Use at your own discretion and in accordance with the site's [terms of service](https://wallhaven.cc/about).
 
-[![codecov](https://codecov.io/gh/raycadle/WallhavenAPI/branch/master/graph/badge.svg?token=9V91WO5EBN)](https://codecov.io/gh/raycadle/WallhavenAPI)
+[![codecov](https://codecov.io/gh/raycadle/WallhavenAPI/branch/master/graph/badge.svg)](https://codecov.io/gh/raycadle/WallhavenAPI)
 
 [Coverage Reports](https://raycadle.github.io/WallhavenAPI/coverage)
 
