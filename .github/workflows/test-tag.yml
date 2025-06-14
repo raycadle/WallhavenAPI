@@ -3,13 +3,6 @@ name: Python Tests CI
 on:
   push:
     branches: [master]
-    paths:
-      - '.github/workflows/**'
-      - 'wallhavenapi/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'requirements-tests.txt'
-      - 'requirements.txt'
     paths-ignore:
       - '.gitignore'
       - 'LICENSE'
@@ -17,13 +10,6 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize]
-    paths:
-      - '.github/workflows/**'
-      - 'wallhavenapi/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'requirements-tests.txt'
-      - 'requirements.txt'
     paths-ignore:
       - '.gitignore'
       - 'LICENSE'
