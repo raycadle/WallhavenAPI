@@ -10,6 +10,8 @@ It is suitable for building custom tools or integrations around the Wallhaven AP
 > This project is unofficial and not affiliated with [Wallhaven.cc](https://wallhaven.cc).
 > Use at your own discretion and in accordance with the site's [terms of service](https://wallhaven.cc/about).
 
+[Coverage Reports](https://raycadle.github.io/WallhavenAPI/coverage)
+
 ---
 
 ## 📦 Installation
