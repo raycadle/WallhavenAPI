@@ -225,7 +225,7 @@ jobs:
           cd gh-pages
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git add .
           git commit -m "Deploy coverage: ${{ steps.meta.outputs.folder }}"
           git push origin gh-pages
@@ -257,18 +257,26 @@ jobs:
             echo "bump=major" >> "$GITHUB_OUTPUT"
           elif echo "$COMMIT_MSG" | grep -iq "#minor"; then
             echo "bump=minor" >> "$GITHUB_OUTPUT"
-          else
+          elif echo "$COMMIT_MSG" | grep -iq "#patch"; then
             echo "bump=patch" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=none" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Bump version
         id: bump_version
         run: |
+          BUMP_TYPE=${{ steps.bump_type.outputs.bump }}
+          if [ "$BUMP_TYPE" == "none" ]; then
+            echo "No version bump required. Skipping tag creation."
+            exit 0  # Skip version bump
+          fi
+          
           OLD_TAG=${{ steps.get_tag.outputs.tag }}
           VERSION=${OLD_TAG#v}
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
 
-          case "${{ steps.bump_type.outputs.bump }}" in
+          case "$BUMP_TYPE" in
             major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0;;
             minor) MINOR=$((MINOR + 1)); PATCH=0;;
             patch) PATCH=$((PATCH + 1));;
@@ -278,14 +286,13 @@ jobs:
           echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Create and push new tag
+        if: steps.bump_version.outcome != 'skipped'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}
           git tag ${{ steps.bump_version.outputs.new_tag }}
           git push origin ${{ steps.bump_version.outputs.new_tag }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
 
   tag-open-pr:
     name: Tag Open Pull Request (Non-Semantic)
@@ -307,11 +314,10 @@ jobs:
           
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}
           git tag "$TAG"
           git push origin "$TAG"
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
   cleanup:
     name: Delete Merged PR Tags
